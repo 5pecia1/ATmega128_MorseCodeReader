@@ -37,7 +37,8 @@ void main(void){
 }
 
 void test_output(){
-	int i,j;
+	int i, j;
+	char temp;
 
 	sprintf(LCD_Line1, "MorseCodeReader ");
 	spirntf(LCD_Line2, "test");
@@ -45,20 +46,47 @@ void test_output(){
 	
 	for(i = 0; i < 3; i++){	
 		led = 0xFE;
+		j = 0;
 		string_output_segment(test);
+		delay_ms(250);
+
 		do{
+			temp = test[j];
+			test[j] = 0xFF;
+
 			PORTC = led;
-			delay_ms(500);
 			led <<= 1;
 			led |= 0x01;
+
+			string_output_segment(test);
+			test[j] = temp;
+			j = (++j % 4);
+			delay_ms(500);
 		}while(led != 0x7F);
 
 		do{
-			PROTC = led;
-			delay_ms(500);
+			temp = test[j];
+			test[j] = 0xFF;
+
+			PORTC = led;
 			led >>= 1;
 			led |= 0x80;
+
+			string_output_segment(test);
+			test[j] = temp;
+			j = (++j % 4);
+
+			delay_ms(500);
 		}while(led != 0xFE);
+
+		temp = test[j];
+		test[j] = 0xFF;
+		
+		PORTC = 0x00;
+		string_output_segment(test);
+		test[j] = temp;
+
+		delay_ms(250);
 	}
 }
 
