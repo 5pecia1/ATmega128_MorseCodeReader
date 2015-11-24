@@ -2,13 +2,17 @@
 #include <delay.h>
 
 void LCD_INIT();       //TEXTLCD 초기화 과정, lcd내의 작은컨트롤러 초기화
-void LCD_DISP_STRING(unsigned char *char_array, unsigned char * char_array2); //어떤스트링 값을 텍스트 LCD에 찍기* 함
+void LCD_DISP_STRING(unsigned char *char_array, unsigned char *char_array2); //어떤스트링 값을 텍스트 LCD에 찍기* 함
 void test_output();
-
+void string_output_segment(char *);
 char seg_pat[16] = {
  0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07
  ,0x7f,0x6f,0x77,0x7c,0x39,0x5e,0x79,0x71};
 };
+char test[4] = {0x78,0x79,0x6d,0x78};
+char in [4] = {0x00,0x00,0x60,0x54};
+char out[4] = {0x00,0x5C,0x1C,0x78};
+char del[4] = {0x00,0x5E,0x79,0x38};
 
 //unsigned char LCD_Line[33];
 unsigned char LCD_Line1[17];
@@ -35,12 +39,13 @@ void main(void){
 void test_output(){
 	int i,j;
 
-	for(i = 0; i < 5; i++){
-		sprintf(LCD_Line1, "MorseCodeReader ");
-		spirntf(LCD_Line2, "test");
-		LCD_DISP_STRING(LCD_Line1, LCD_Line2);
-		
+	sprintf(LCD_Line1, "MorseCodeReader ");
+	spirntf(LCD_Line2, "test");
+	LCD_DISP_STRING(LCD_Line1, LCD_Line2);
+	
+	for(i = 0; i < 3; i++){	
 		led = 0xFE;
+		string_output_segment(test);
 		do{
 			PORTC = led;
 			delay_ms(500);
@@ -54,7 +59,21 @@ void test_output(){
 			led >>= 1;
 			led |= 0x80;
 		}while(led != 0xFE);
+	}
+}
 
+void string_output_segment(char *string){
+	int f, b;
+	char fnum;
+
+	fnum = 0b00010000;	
+
+	for(f = 0; f < 4; f++){
+		PORTF = fnum;
+		PORTB = string[b];
+		delay_ms(5);
+		fnum <<= 1;
+		b++;
 	}
 }
 
