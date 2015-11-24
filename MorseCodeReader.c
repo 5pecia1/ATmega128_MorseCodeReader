@@ -5,36 +5,57 @@ void LCD_INIT();       //TEXTLCD 초기화 과정, lcd내의 작은컨트롤러 초기화
 void LCD_DISP_STRING(unsigned char *char_array, unsigned char * char_array2); //어떤스트링 값을 텍스트 LCD에 찍기* 함
 void test_output();
 
-
-//unsigned char LCD_Line[33];
-unsigned char LCD_Line1[17];
-unsigned char LCD_Line2[17];
-
 char seg_pat[16] = {
  0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07
  ,0x7f,0x6f,0x77,0x7c,0x39,0x5e,0x79,0x71};
 };
 
+//unsigned char LCD_Line[33];
+unsigned char LCD_Line1[17];
+unsigned char LCD_Line2[17];
+
+unsigned char led = 0;
+
 void main(void){
 	
 	DDRA = 0xFF;
         DDRD = 0xFF; 
+	DDRC = 0xFF; // led
+	DDRE = 0x00; // sw
+	DDRB = 0xFF; //7-segment
+	DDRF = 0xF0; //4~1 segment
 
-	ADMUX = 0x10;      // ADC0 단극성 입력 선택
-        ADCSRA = 0x87;    // ADEN=1, 16MHz  256분주 -> 125kHz
         delay_ms(5);                    
         
         LCD_INIT();
 	test_output();
-	While(1);
+	
 }
 
 void test_output(){
+	int i,j;
 
-	sprintf(LCD_Line1, "MorseCodeReader   ");
-	spirntf(LCD_Line2, "made by sol, chul ");
-	LCD_DISP_STRING(LCD_Line1, LCD_Line2);
-	delay_ms(1000);
+	for(i = 0; i < 5; i++){
+		sprintf(LCD_Line1, "MorseCodeReader ");
+		spirntf(LCD_Line2, "test");
+		LCD_DISP_STRING(LCD_Line1, LCD_Line2);
+		
+		led = 0xFE;
+		do{
+			PORTC = led;
+			delay_ms(500);
+			led <<= 1;
+			led |= 0x01;
+		}while(led != 0x7F);
+
+		do{
+			PROTC = led;
+			delay_ms(500);
+			led >>= 1;
+			led |= 0x80;
+		}while(led != 0xFE);
+
+	}
 }
 
 void LCD_INIT() // 그대로 배껴서 쓰면 됨
