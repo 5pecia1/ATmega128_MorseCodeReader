@@ -19,6 +19,7 @@ unsigned char LCD_Line1[17];
 unsigned char LCD_Line2[17];
 
 unsigned char led = 0;
+int pwm = 0x0200;
 
 void main(void){
 	
@@ -39,6 +40,14 @@ void main(void){
 void test_output(){
 	int i, j;
 	char temp;
+	
+	TCCR1A = 0b00001011;
+	TCCR1B = 0x05;
+	TCCR1C = 0x0;
+	TCNT1 = 0x0000;
+	OCR1CH = (pwm & 0xFF00) >> 8;
+	OCR1CL = pwm & 0x0FF;
+	SREG = 0x80;
 
 	sprintf(LCD_Line1, "MorseCodeReader ");
 	spirntf(LCD_Line2, "test");
@@ -48,7 +57,7 @@ void test_output(){
 		led = 0xFE;
 		j = 0;
 		string_output_segment(test);
-		delay_ms(250);
+		delay_ms(25);
 
 		do{
 			temp = test[j];
@@ -61,7 +70,7 @@ void test_output(){
 			string_output_segment(test);
 			test[j] = temp;
 			j = (++j % 4);
-			delay_ms(500);
+			delay_ms(50);
 		}while(led != 0x7F);
 
 		do{
@@ -76,7 +85,7 @@ void test_output(){
 			test[j] = temp;
 			j = (++j % 4);
 
-			delay_ms(500);
+			delay_ms(50);
 		}while(led != 0xFE);
 
 		temp = test[j];
@@ -86,7 +95,7 @@ void test_output(){
 		string_output_segment(test);
 		test[j] = temp;
 
-		delay_ms(250);
+		delay_ms(25);
 	}
 }
 
