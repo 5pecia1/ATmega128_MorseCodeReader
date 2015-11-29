@@ -1,14 +1,25 @@
-#include <mage128.h>
+#include <mega128.h>
 #include <delay.h>
+#include <string.h>
+#include <stdio.h>
 
-void LCD_INIT();       //TEXTLCD ÃÊ±âÈ­ °úÁ¤, lcd³»ÀÇ ÀÛÀºÄÁÆ®·Ñ·¯ ÃÊ±âÈ­
-void LCD_DISP_STRING(unsigned char *char_array, unsigned char *char_array2); //¾î¶²½ºÆ®¸µ °ªÀ» ÅØ½ºÆ® LCD¿¡ Âï±â* ÇÔ
+#define LCD_DATA		PORTA
+// #define LCD_DATA		PORTC
+
+#define LCD_RS		        PORTD.0  
+#define LCD_RW_L		PORTD.1 
+#define LCD_ENABLE		PORTD.2       
+#define LCD_DELAY		1   //ms
+#define LCD_DELAY2		20   //ms  
+
+void LCD_INIT();       //TEXTLCD ì´ˆê¸°í™” ê³¼ì •, lcdë‚´ì˜ ìž‘ì€ì»¨íŠ¸ë¡¤ëŸ¬ ì´ˆê¸°í™”
+void LCD_DISP_STRING(unsigned char *char_array, unsigned char *char_array2); //ì–´ë–¤ìŠ¤íŠ¸ë§ ê°’ì„ í…ìŠ¤íŠ¸ LCDì— ì°ê¸°* í•¨
 void test_output();
 void string_output_segment(char *);
 char seg_pat[16] = {
  0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07
  ,0x7f,0x6f,0x77,0x7c,0x39,0x5e,0x79,0x71};
-};
+
 char test[4] = {0x78,0x79,0x6d,0x78};
 char in [4] = {0x00,0x00,0x60,0x54};
 char out[4] = {0x00,0x5C,0x1C,0x78};
@@ -47,13 +58,13 @@ void test_output(){
 	TCNT1 = 0x0000;
 	OCR1CH = (pwm & 0xFF00) >> 8;
 	OCR1CL = pwm & 0x0FF;
-	SREG = 0x80;
+	SREG = 0x80;    
 
 	sprintf(LCD_Line1, "MorseCodeReader ");
-	spirntf(LCD_Line2, "test");
+	sprintf(LCD_Line2, "test            ");
 	LCD_DISP_STRING(LCD_Line1, LCD_Line2);
 	
-	for(i = 0; i < 3; i++){	
+	for(i = 0; i < 6; i++){	
 		led = 0xFE;
 		j = 0;
 		string_output_segment(test);
@@ -108,13 +119,13 @@ void string_output_segment(char *string){
 	for(f = 0; f < 4; f++){
 		PORTF = fnum;
 		PORTB = string[b];
-		delay_ms(5);
+		delay_ms(3);
 		fnum <<= 1;
 		b++;
 	}
 }
 
-void LCD_INIT() // ±×´ë·Î ¹è²¸¼­ ¾²¸é µÊ
+void LCD_INIT() // ê·¸ëŒ€ë¡œ ë°°ê»´ì„œ ì“°ë©´ ë¨
 {
 
             //int i;
@@ -173,7 +184,7 @@ void LCD_INIT() // ±×´ë·Î ¹è²¸¼­ ¾²¸é µÊ
 
 void LCD_DISP_STRING(unsigned char *char_array1, unsigned char *char_array2) // 
 {
-int i,ti;
+int i;
  unsigned char tmp_c_array[32];
 
         LCD_RS=0;       //    pokeb( LCD_RS, 0x00);    // INSTRUCTION
@@ -199,7 +210,7 @@ int i,ti;
 	      delay_ms(2);
 
 
-  	LCD_DATA= 0x80;   // SET DD RAM ADDRESS Ã¹¹øÂ°ÁÙ  ÁÙ Ã¹¹øÂ° À§Ä¡
+  	LCD_DATA= 0x80;   // SET DD RAM ADDRESS ì²«ë²ˆì§¸ì¤„  ì¤„ ì²«ë²ˆì§¸ ìœ„ì¹˜
 	LCD_ENABLE=0;   //    pokeb( LCD_ENABLE, 0x00);  // E  HIGH PULSE
 	LCD_ENABLE=1;   //    pokeb( LCD_ENABLE, 0x01);  // E  HIGH PULSE
 	LCD_ENABLE=0;   //    pokeb( LCD_ENABLE, 0x00);  // E  HIGH PULSE
@@ -222,12 +233,12 @@ int i,ti;
 
 	    }
 
-	    ti = strlen(char_array);
+	   
 	    strcpy( tmp_c_array,char_array1 );
  //          sprintf(tmp_c_array,"%s", char_array);
 
- //	    ti = strlen(char_array);  // ³ª¸ÓÁö ºÎºÐ °ø¹éÀ¸·Î ³ª¿À°ÔÇÏ±â
- //       for  (i=0; i< ti; i++)  tmp_c_array[i]= char_array [i]; // ³ª¸ÓÁö ºÎºÐ °ø¹éÀ¸·Î ³ª¿À°ÔÇÏ±â
+ //	    ti = strlen(char_array);  // ë‚˜ë¨¸ì§€ ë¶€ë¶„ ê³µë°±ìœ¼ë¡œ ë‚˜ì˜¤ê²Œí•˜ê¸°
+ //       for  (i=0; i< ti; i++)  tmp_c_array[i]= char_array [i]; // ë‚˜ë¨¸ì§€ ë¶€ë¶„ ê³µë°±ìœ¼ë¡œ ë‚˜ì˜¤ê²Œí•˜ê¸°
 
         LCD_RS=1;       //    pokeb( LCD_RS, 0x01);    // DATA
 	LCD_RW_L=0;     //    pokeb( LCD_RW_L, 0x00);    // WRITE
@@ -253,7 +264,7 @@ int i,ti;
    		    	   delay_us(50);
 
 
- 	LCD_DATA= 0xC0;   // SET DD RAM ADDRESS ¾Æ·§ ÁÙ Ã¹¹øÂ° À§Ä¡
+ 	LCD_DATA= 0xC0;   // SET DD RAM ADDRESS ì•„ëž« ì¤„ ì²«ë²ˆì§¸ ìœ„ì¹˜
 	LCD_ENABLE=0;   //    pokeb( LCD_ENABLE, 0x00);  // E  HIGH PULSE
 	LCD_ENABLE=1;   //    pokeb( LCD_ENABLE, 0x01);  // E  HIGH PULSE
 	LCD_ENABLE=0;   //    pokeb( LCD_ENABLE, 0x00);  // E  HIGH PULSE
@@ -272,10 +283,10 @@ int i,ti;
 
 	    }
 
-	    ti = strlen(char_array);
+
 	    strcpy( tmp_c_array,char_array2 );
 
-	    for  (i= 0x01 ; i<= 0x0F; i++) {
+	    for  (i= 0 ; i<= 0x0F; i++) {
 	LCD_DATA = tmp_c_array[i];         // EXT4
 	LCD_ENABLE=0;   //    pokeb( LCD_ENABLE, 0x00);  // E  HIGH PULSE
 	LCD_ENABLE=1;   //    pokeb( LCD_ENABLE, 0x01);  // E  HIGH PULSE
