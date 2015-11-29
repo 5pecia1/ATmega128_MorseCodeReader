@@ -12,28 +12,67 @@
 #define LCD_DELAY		1   //ms
 #define LCD_DELAY2		20   //ms  
 #define PWM                     0x2000
+#define MORSE_LENGTH                36
 #define TEST_COUNT              780
+#define LINE_LENGTH             17        
+
 void LCD_INIT();       //TEXTLCD 초기화 과정, lcd내의 작은컨트롤러 초기화
 void LCD_DISP_STRING(unsigned char *char_array, unsigned char *char_array2); //어떤스트링 값을 텍스트 LCD에 찍기* 함
 void test_output();                  
 void start_morse();
 void string_output_segment(char *);
+void display_word(int);
+
 char seg_pat[16] = {
  0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07
- ,0x7f,0x6f,0x77,0x7c,0x39,0x5e,0x79,0x71};
+ ,0x7f,0x6f,0x77,0x7c,0x39,0x5e,0x79,0x71
+ };        
+ 
+unsigned int morse[MORSE_LENGTH]= {//
+ 0b10111,  0b111010101, 0b11101011101, //abc
+ 0b1110101, 0b1, 0b101011101,          //def
+ 0b111011101, 1010101, 0b101,          //ghi
+ 0b1011101110111, 0b111010111, 0b101110101,//jkl 
+ 0b1110111, 0b11101, 0b11101110111,        //mno
+ 0b10111011101, 0b1110111010111, 0b1011101,//pqr
+ 0b10101, 0b111, 0b1010111,                //stu
+ 0b101010111, 0b101110111, 0b11101010111,  // vwx
+ 0b1110101110111, 0b11101110101,           //yz
+ 0b10111011101110111, 0b101011101110111, 0b1010101110111,//123
+ 0b10101010111, 0b101010101, 0b11101010101,              //456
+ 0b1110111010101, 0b111011101110101, 0b11101110111011101,//789
+ 0b1110111011101110111                                   //0
+};
+unsigned char morse_change[MORSE_LENGTH] = {
+ 'A','B','C',
+ 'D','E','F',
+ 'G','H','I',
+ 'J','K','L',
+ 'M','N','O',
+ 'P','Q','R',
+ 'S','T','U',
+ 'V','W','X',
+ 'Y','Z',
+ '1','2','3',
+ '4','5','6',
+ '7','8','9',
+ '0' 
+};
 
 char test[4] = {0x78,0x79,0x6d,0x78};
 char in [4] = {0x00,0x00,0x30,0x54};
 char out[4] = {0x00,0x5C,0x1C,0x78};
 char del[4] = {0x00,0x5E,0x79,0x38};
+char max[4] = {0x00, 0b00010101,0b01110111,0b01110110};
 char pulseA = 0b00000011;      
 char pulseB = 0x0;
 
-unsigned char LCD_Line1[17];
-unsigned char LCD_Line2[17];
+unsigned char LCD_Line1[LINE_LENGTH];
+unsigned char LCD_Line2[LINE_LENGTH];
 
 unsigned char led = 0xFE;
-unsigned int cnt = 0, step = 0, click = 0;  
+unsigned int cnt = 0, step = 0, click = 0, notend=0, click_cnt = 0;
+unsigned int current_length = 0;  
 
 
 void main(void){
@@ -68,7 +107,10 @@ void start_morse(){
 	TCCR1C = 0x0;
 	OCR1A = 0x4000;
 	OCR1CH = (PWM & 0xFF00) >> 8;
-  	OCR1CL = PWM & 0x0FF; 
+  	OCR1CL = PWM & 0x0FF;
+  	
+  	EIMSK = 0b01110000;//sw interrupt
+        EICRB = 0b00101001; 
 
 	SREG = 0x80; 
         
@@ -94,6 +136,13 @@ void test_output(){
 	
 	SREG = 0x80;  	       
 }               
+  
+void display_word(int num){      
+        LCD_Line1[current_length++] = morse_change[num];
+        LCD_Line1[current_length] = 0;        
+           
+        LCD_DISP_STRING(LCD_Line1, LCD_Line2);       
+}  
 
 void string_output_segment(char *string){
 	int f, b=0;
@@ -109,26 +158,104 @@ void string_output_segment(char *string){
 		b++;       
 		PORTB = 0x00;
 	}
-}  
+}
+
+interrupt [EXT_INT4] void external_int4(void){//input 
+         //make MAX i<LINE_LENGTH && 
+        if(current_length != LINE_LENGTH- 1 && step == 1){ 
+                if(click ==0){//push
+                        click=1; 
+                        click_cnt=0;       
+                }
+                else{//up             
+                        click++;
+                        cnt = 0;
+                }                                 
+        }                                            
+}                       
+
+interrupt [EXT_INT5] void external_int5(void){//del
+        step = 2;       
+}    
+interrupt [EXT_INT6] void external_int6(void){//output
+        
+}
+  
 interrupt  [TIM1_OVF] void timer_int(void){
-        cnt++;
-                 if(led == 0x7F){ 
-                         PORTC = led;
-                         led = 0xFE;
-                 }    
-                 else{
-                         PORTC = led;  
-                         led <<= 1;
-                         led |= 0x01;                  
-                 }       
-} 
-interrupt  [TIM0_COMP] void timer_comp0(void){
-        if(step == 1){
-                string_output_segment(in);
-                
+        
+        
+        if(click % 2){//누르고 있을 동안
+                click_cnt++;
+        } 
+        else{      //안누르는 동안
+                cnt++;
         }
-}                   
-interrupt [TIM0_OVF] void timer_ovf0(void){ 
+        
+}  
+
+interrupt  [TIM0_COMP] void timer_comp0(void){
+        int i; 
+        
+        if(current_length == LINE_LENGTH - 1){
+               string_output_segment(max);           
+               cnt++; 
+        }
+        
+        else if(step == 1){
+                string_output_segment(in);
+
+                if(click == 0 && cnt > 3){//word to word
+                        if(notend){ 
+                                for(i = 0; i< MORSE_LENGTH; i++){
+                                        if(notend == morse[i]){ 
+                                                 notend = 0;   
+                                                 click =0;
+                                                 display_word(i);
+                                                 break;
+                                        }
+                                }  
+                        }                
+                }                                       
+                else{//spell to spell
+                      if(click_cnt >= 3 && click == 2){//long line 
+                             notend <<= 4;
+                             notend |= 0b111;
+                             cnt = 0;
+                             click = 0;
+                      }                            
+                      else if(click == 2){//short line 
+                             notend <<= 2;
+                             notend |= 0b1;
+                             click = 0;
+                      }
+                }
+        	 sprintf(LCD_Line2, "c:%d,nt:%x,cc:%d",cnt, notend,click_cnt);
+	         LCD_DISP_STRING(LCD_Line1, LCD_Line2); 
+        }
+        else if(step == 2){//del memory | word
+                if(notend){
+                        notend =0;
+                }                 
+                else if(current_length > 0){ 
+                       LCD_Line1[--current_length] = 0;        
+                       LCD_DISP_STRING(LCD_Line1, LCD_Line2);       
+                }        
+                step =3;
+                cnt =0;
+        }              
+        else if(step == 3){//display del for segment
+                if(cnt > 32+16){
+                        step = 1;
+                        cnt = 0;
+                }               
+                string_output_segment(del);           
+                cnt++;
+
+        }  
+        
+}   
+                
+interrupt [TIM0_OVF] void timer_ovf0(void){//first test code 
         cnt++;
         string_output_segment(test);           
         if(cnt > TEST_COUNT){//세 번 움직임.    
@@ -136,8 +263,9 @@ interrupt [TIM0_OVF] void timer_ovf0(void){
                  TIMSK = 0x00;
                  TCCR1A = 0x00; 
                  TCCR1B = 0x00;
-                 sprintf(LCD_Line1, "");
-        	 sprintf(LCD_Line2, "");
+                 sprintf(LCD_Line1, "%s", "");
+        	 sprintf(LCD_Line2, "%s", "");
+                LCD_Line1[0] = LCD_Line2[0] = 0;
 	         LCD_DISP_STRING(LCD_Line1, LCD_Line2);  
 	         step++;
         }
