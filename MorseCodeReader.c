@@ -29,15 +29,15 @@ char del[4] = {0x00,0x5E,0x79,0x38};
 unsigned char LCD_Line1[17];
 unsigned char LCD_Line2[17];
 
-unsigned char led = 0;
-int pwm = 0x2000;
+unsigned char led = 0xFE;
+int pwm = 0x2000, cnt = 0;
 
 void main(void){
 	
 	DDRA = 0xFF;
         DDRD = 0xFF; 
 	DDRC = 0xFF; // led
-	DDRE = 0x00; // sw
+	//DDRE = 0x00; // sw
 	DDRB = 0xFF; //7-segment
 	DDRF = 0xF0; //4~1 segment
 
@@ -49,82 +49,68 @@ void main(void){
 }
 
 void test_output(){
-	int i, j;
-	char temp;
+	int i;
+          
+	sprintf(LCD_Line1, "MorseCodeReader");
+	sprintf(LCD_Line2, "test");
+	LCD_DISP_STRING(LCD_Line1, LCD_Line2);
+        
 	
-	TCCR1A = 0b00001011;
+	TCCR1A = 0b00001011; //set oc1c
 	TCCR1B = 0b00010100;
 	TCCR1C = 0x0;
 	TCNT1 = 0x0000;
 	OCR1A = 0x4000;
 	OCR1CH = (pwm & 0xFF00) >> 8;
 	OCR1CL = pwm & 0x0FF;  
+	                   
+	TIMSK = 0x01;
+	TCCR0 = 0x07;
+	TCNT0 = 0x00;    
 	
-	SREG = 0x80;    
-
-	sprintf(LCD_Line1, "MorseCodeReader ");
-	sprintf(LCD_Line2, "test            ");
-	LCD_DISP_STRING(LCD_Line1, LCD_Line2);
-	
-	for(i = 0; i < 6; i++){	
-		led = 0xFE;
-		j = 0;
-		string_output_segment(test);
-		delay_ms(25);
-
-		do{
-			temp = test[j];
-			test[j] = 0xFF;
-
-			PORTC = led;
-			led <<= 1;
-			led |= 0x01;
-
-			string_output_segment(test);
-			test[j] = temp;
-			j = (++j % 4);
-			delay_ms(50);
-		}while(led != 0x7F);
-
-		do{
-			temp = test[j];
-			test[j] = 0xFF;
-
-			PORTC = led;
-			led >>= 1;
-			led |= 0x80;
-
-			string_output_segment(test);
-			test[j] = temp;
-			j = (++j % 4);
-
-			delay_ms(50);
-		}while(led != 0xFE);
-
-		temp = test[j];
-		test[j] = 0xFF;
-		
-		PORTC = 0x00;
-		string_output_segment(test);
-		test[j] = temp;
-
-		delay_ms(25);
-	}
-}
+	SREG = 0x80;  	   
+}               
 
 void string_output_segment(char *string){
-	int f, b;
+	int f, b=0;
 	char fnum;
 
-	fnum = 0b00010000;	
+	fnum = 0b10000000;	
 
 	for(f = 0; f < 4; f++){
 		PORTF = fnum;
-		PORTB = string[b];
-		delay_ms(3);
-		fnum <<= 1;
-		b++;
+		PORTB = string[b];  
+		delay_ms(5);
+		fnum >>= 1;
+		b++;       
+		PORTB = 0x00;
 	}
+}
+                   
+interrupt [TIM0_OVF] void timer_comp0(void){ 
+        cnt++;
+        string_output_segment(test);           
+        if(cnt > 780){//세 번 움직임.    
+                 PORTC = 0xFF;
+                 TIMSK = 0x00;
+                 TCCR1A = 0x00; 
+                 TCCR1B = 0x00;
+                 sprintf(LCD_Line1, "");
+        	 sprintf(LCD_Line2, "");
+	         LCD_DISP_STRING(LCD_Line1, LCD_Line2);  
+        }
+        else if((cnt %32)== 31){
+                 if(led == 0x7F){ 
+                         PORTC = led;
+                         led = 0xFE;
+                 }    
+                 else{
+                         PORTC = led;  
+                         led <<= 1;
+                         led |= 0x01;                  
+                 }
+                 
+        }        
 }
 
 void LCD_INIT() // 그대로 배껴서 쓰면 됨
@@ -233,7 +219,13 @@ int i;
 	   tmp_c_array[i]= 0x20;
    	   tmp_c_array[i]= ' ';
 
+	    }    
+	    for(i=0;char_array1[i]!=NULL;i++){
 	    }
+	    for(;i<16;i++){
+	        char_array1[i] = ' ';
+ 	    }
+            char_array1[i] = 0;
 
 	   
 	    strcpy( tmp_c_array,char_array1 );
@@ -284,8 +276,14 @@ int i;
    	   tmp_c_array[i]= ' ';
 
 	    }
-
-
+                   
+	    for(i=0;char_array2[i] !=0;i++){
+	    }
+	    for(;i<=0x0F;i++){
+	        char_array2[i] = ' ';
+ 	    }
+            char_array2[i] = 0;
+            
 	    strcpy( tmp_c_array,char_array2 );
 
 	    for  (i= 0 ; i<= 0x0F; i++) {
