@@ -11,10 +11,12 @@
 #define LCD_ENABLE		PORTD.2       
 #define LCD_DELAY		1   //ms
 #define LCD_DELAY2		20   //ms  
+#define PWM                     0x2000
 
 void LCD_INIT();       //TEXTLCD 초기화 과정, lcd내의 작은컨트롤러 초기화
 void LCD_DISP_STRING(unsigned char *char_array, unsigned char *char_array2); //어떤스트링 값을 텍스트 LCD에 찍기* 함
-void test_output();
+void test_output();                  
+void input_morse();
 void string_output_segment(char *);
 char seg_pat[16] = {
  0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07
@@ -24,13 +26,15 @@ char test[4] = {0x78,0x79,0x6d,0x78};
 char in [4] = {0x00,0x00,0x60,0x54};
 char out[4] = {0x00,0x5C,0x1C,0x78};
 char del[4] = {0x00,0x5E,0x79,0x38};
+char pulseA = 0b00000011;      
+char pulseB = 0x0;
 
-//unsigned char LCD_Line[33];
 unsigned char LCD_Line1[17];
 unsigned char LCD_Line2[17];
 
 unsigned char led = 0xFE;
-int pwm = 0x2000, cnt = 0;
+int cnt = 0, step = 0;  
+
 
 void main(void){
 	
@@ -44,10 +48,20 @@ void main(void){
         delay_ms(5);                    
         
         LCD_INIT();
-	test_output();
+	test_output();          
+	while(step == 0);
+	while(1){
+	        while(step == 1){
+	                input_morse();
+	        }
+	        
+	}
 	
 }
-
+           
+void input_morse(){
+        
+}
 void test_output(){
 	int i;
           
@@ -56,19 +70,19 @@ void test_output(){
 	LCD_DISP_STRING(LCD_Line1, LCD_Line2);
         
 	
-	TCCR1A = 0b00001011; //set oc1c
-	TCCR1B = 0b00010100;
+	TCCR1A = 0b00001000 | pulseA; //set oc1c
+	TCCR1B = 0b00010100 | pulseB;
 	TCCR1C = 0x0;
 	TCNT1 = 0x0000;
 	OCR1A = 0x4000;
-	OCR1CH = (pwm & 0xFF00) >> 8;
-	OCR1CL = pwm & 0x0FF;  
+	OCR1CH = (PWM & 0xFF00) >> 8;
+	OCR1CL = PWM & 0x0FF;  
 	                   
 	TIMSK = 0x01;
 	TCCR0 = 0x07;
 	TCNT0 = 0x00;    
 	
-	SREG = 0x80;  	   
+	SREG = 0x80;  	       
 }               
 
 void string_output_segment(char *string){
@@ -98,6 +112,7 @@ interrupt [TIM0_OVF] void timer_comp0(void){
                  sprintf(LCD_Line1, "");
         	 sprintf(LCD_Line2, "");
 	         LCD_DISP_STRING(LCD_Line1, LCD_Line2);  
+	         step++;
         }
         else if((cnt %32)== 31){
                  if(led == 0x7F){ 
@@ -112,6 +127,7 @@ interrupt [TIM0_OVF] void timer_comp0(void){
                  
         }        
 }
+         
 
 void LCD_INIT() // 그대로 배껴서 쓰면 됨
 {
