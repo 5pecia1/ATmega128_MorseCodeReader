@@ -22,7 +22,7 @@ void test_output();
 void start_morse();
 void string_output_segment(char *);
 void display_word(int);
-
+void change_OC1C(int);
 char seg_pat[16] = {
  0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07
  ,0x7f,0x6f,0x77,0x7c,0x39,0x5e,0x79,0x71
@@ -77,14 +77,16 @@ unsigned long int   notend=0, out_word=0;
 
 
 void main(void){
-	int i;
 	DDRA = 0xFF;
         DDRD = 0xFF; 
 	DDRC = 0xFF; // led
 	//DDRE = 0x00; // sw
 	DDRB = 0xFF; //7-segment
 	DDRF = 0xF0; //4~1 segment
-
+         
+	ADMUX = 0x0;
+	ADCSRA = 0b11100111;
+	
         delay_ms(5);                    
         LCD_INIT();
 	test_output();          
@@ -116,9 +118,7 @@ void start_morse(){
 	SREG = 0x80; 
         
 }
-void test_output(){
-	int i;
-          
+void test_output(){ 
 	sprintf(LCD_Line1, "MorseCodeReader");
 	sprintf(LCD_Line2, "test");
 	LCD_DISP_STRING(LCD_Line1, LCD_Line2);
@@ -161,6 +161,17 @@ void string_output_segment(char *string){
 	}
 }
 
+void change_OC1C(int val){
+        int div = 1024/2;
+        
+        if(div > val){  
+                pulseB = 0b100;
+        }
+        else{                 
+                pulseB = 0b101;
+        }
+}
+
 interrupt [EXT_INT4] void external_int4(void){//input 
          //make MAX i<LINE_LENGTH && 
         if(current_length != LINE_LENGTH- 1 && step == 1){ 
@@ -198,7 +209,7 @@ interrupt  [TIM1_OVF] void timer_int(void){
 }  
 
 interrupt  [TIM0_COMP] void timer_comp0(void){
-        int i, check; 
+        int i; 
         
         if(current_length == LINE_LENGTH - 1){
                string_output_segment(max);           
@@ -328,7 +339,7 @@ interrupt  [TIM0_COMP] void timer_comp0(void){
                 string_output_segment(out);           
                 cnt++;
         }
-        
+        change_OC1C((int)ADCL+((int)ADCH << 8));
 }   
                 
 interrupt [TIM0_OVF] void timer_ovf0(void){//first test code 
