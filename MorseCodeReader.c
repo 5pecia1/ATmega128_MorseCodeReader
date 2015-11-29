@@ -28,7 +28,7 @@ char seg_pat[16] = {
  ,0x7f,0x6f,0x77,0x7c,0x39,0x5e,0x79,0x71
  };        
  
-unsigned int morse[MORSE_LENGTH]= {//
+unsigned long int morse[MORSE_LENGTH]= {//
  0b10111,  0b111010101, 0b11101011101, //abc
  0b1110101, 0b1, 0b101011101,          //def
  0b111011101, 1010101, 0b101,          //ghi
@@ -71,8 +71,9 @@ unsigned char LCD_Line1[LINE_LENGTH];
 unsigned char LCD_Line2[LINE_LENGTH];
 
 unsigned char led = 0xFE;
-unsigned int cnt = 0, step = 0, click = 0, notend=0, click_cnt = 0;
-unsigned int current_length = 0, out_word=0;  
+unsigned int cnt = 0, step = 0, click = 0, click_cnt = 0;
+unsigned int current_length = 0, current_output = 0; 
+unsigned long int   notend=0, out_word=0; 
 
 
 void main(void){
@@ -165,7 +166,8 @@ interrupt [EXT_INT4] void external_int4(void){//input
         if(current_length != LINE_LENGTH- 1 && step == 1){ 
                 if(click ==0){//push
                         click=1; 
-                        click_cnt=0;       
+                        click_cnt=0;
+                        cnt=0;       
                 }
                 else{//up             
                         click++;
@@ -175,10 +177,12 @@ interrupt [EXT_INT4] void external_int4(void){//input
 }                       
 
 interrupt [EXT_INT5] void external_int5(void){//del
-        step = 2;       
+        if(step == 1)
+                step = 2;       
 }    
 interrupt [EXT_INT6] void external_int6(void){//output
-        step = 4;
+        step = 4; 
+        cnt = 0;
 }
   
 interrupt  [TIM1_OVF] void timer_int(void){
@@ -215,6 +219,7 @@ interrupt  [TIM0_COMP] void timer_comp0(void){
                                         if(notend == morse[i]){ 
                                                  notend = 0;   
                                                  click =0;
+                                                 cnt=0;
                                                  display_word(i);
                                                  break;
                                         }
@@ -259,42 +264,69 @@ interrupt  [TIM0_COMP] void timer_comp0(void){
 
         }
         else if(step == 4){//output line  
-                string_output_segment(out);
-                if(current_length > 0 || out_word != 0){//라인이 비어 있지 않으면 
+                string_output_segment(out);   
+                
+                if(current_output < current_length || out_word != 0){//라인이 비어 있지 않으면 
                         if(out_word == 0){
-                                out_word = LCD_Line1[--current_length];
-                                if(out_word == ' '){
-                                        out_word = LCD_Line1[--current_length];
+                                out_word = LCD_Line1[current_output];
+                                if((char)out_word == ' '){//space면 한번 쉼
+                                        out_word = 0; 
+                                        LCD_Line1[current_output++] = ' ';
+                                        LCD_DISP_STRING(LCD_Line1, LCD_Line2); 
+                                        delay_ms(500);
+                                        return;
                                 }
+                                LCD_Line1[current_output++] = ' '; 
                                 LCD_DISP_STRING(LCD_Line1, LCD_Line2);
-                                LCD_Line1[current_length] = 0;        
+                                       
+                                
                                 if(out_word >= 'A'){//알파벳이면
                                         out_word = morse[out_word-'A'];
                                 }
                                 else{                              
                                         out_word = morse[out_word-'0'+26];
+                                }     
+                                
+                                while((out_word & 0x80000000) != 0x80000000){ 
+                                        out_word =out_word << 1;             
                                 }
+                                led = 0xFF;
+                                step=5;  
                         }        
-                        else{
-                                check = out_word & 0b10;
-                                if(check == 0b10){//long word
-                                        out_word >>= 3;
-                                        PORTC = 0x00;
+                        else{                                            
+                                if((out_word & 0x40000000) == 0x40000000){//long word
+                                        out_word = out_word << 4;
+                                        led = 0x00;
                                 }                            
                                 else{//short word
-                                        out_word >>= 1; 
-                                        PORTC = 0xFE;
+                                        out_word = out_word << 2;
+                                        led = 0xFE;
                                 } 
-                                delay_ms(500);
-                                PORTC = 0xFF;
-                                delay_ms(500);
+
+                                step = 5;         
                         }                             
 
                 }
                 else{     
                         PORTC = 0xFF;
                         step = 1;
+                        cnt =0;
+                        current_output = 0;
+                        current_length = 0;
                 }
+        }
+        else if(step == 5){
+                if(cnt > 32+16){
+                        step = 4;
+                        cnt = 0;
+                }
+                else if(cnt > 32){
+                        led=0xFF;
+                }
+                
+                PORTC = led;               
+                string_output_segment(out);           
+                cnt++;
         }
         
 }   
