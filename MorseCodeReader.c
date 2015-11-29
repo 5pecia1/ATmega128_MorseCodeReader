@@ -33,11 +33,11 @@ unsigned char LCD_Line1[17];
 unsigned char LCD_Line2[17];
 
 unsigned char led = 0xFE;
-int cnt = 0, step = 0;  
+unsigned int cnt = 0, step = 0, click = 0;  
 
 
 void main(void){
-	
+	int i;
 	DDRA = 0xFF;
         DDRD = 0xFF; 
 	DDRC = 0xFF; // led
@@ -46,21 +46,31 @@ void main(void){
 	DDRF = 0xF0; //4~1 segment
 
         delay_ms(5);                    
-        
         LCD_INIT();
 	test_output();          
 	while(step == 0);
         start_morse();
-	 
+        
+	 while(1);
+       
 	
 }
            
 void start_morse(){
-        TIMSK = 0x02;
-        TCCR0 = 0b00001111;
+        //imter0 7segment, timer1 cnt++
+        TIMSK = 0b00000110; //timer0 cmp on, timer1 ovf on
+        TCCR0 = 0b00001111;//timer 0
         OCR0 = 255;
         TCNT0 = 0x00;
-        SREG = 0x80;
+        
+        TCCR1A = 0b00001000 | pulseA; //timer1, set oc1c
+	TCCR1B = 0b00010100 | pulseB;
+	TCCR1C = 0x0;
+	OCR1A = 0x4000;
+	OCR1CH = (PWM & 0xFF00) >> 8;
+  	OCR1CL = PWM & 0x0FF; 
+
+	SREG = 0x80; 
         
 }
 void test_output(){
@@ -74,7 +84,6 @@ void test_output(){
 	TCCR1A = 0b00001000 | pulseA; //set oc1c
 	TCCR1B = 0b00010100 | pulseB;
 	TCCR1C = 0x0;
-	TCNT1 = 0x0000;
 	OCR1A = 0x4000;
 	OCR1CH = (PWM & 0xFF00) >> 8;
 	OCR1CL = PWM & 0x0FF;  
@@ -100,7 +109,19 @@ void string_output_segment(char *string){
 		b++;       
 		PORTB = 0x00;
 	}
-}
+}  
+interrupt  [TIM1_OVF] void timer_int(void){
+        cnt++;
+                 if(led == 0x7F){ 
+                         PORTC = led;
+                         led = 0xFE;
+                 }    
+                 else{
+                         PORTC = led;  
+                         led <<= 1;
+                         led |= 0x01;                  
+                 }       
+} 
 interrupt  [TIM0_COMP] void timer_comp0(void){
         if(step == 1){
                 string_output_segment(in);
