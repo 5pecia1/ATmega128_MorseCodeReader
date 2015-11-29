@@ -30,7 +30,7 @@ unsigned char LCD_Line1[17];
 unsigned char LCD_Line2[17];
 
 unsigned char led = 0;
-int pwm = 0x0200;
+int pwm = 0x2000;
 
 void main(void){
 	
@@ -53,11 +53,13 @@ void test_output(){
 	char temp;
 	
 	TCCR1A = 0b00001011;
-	TCCR1B = 0x05;
+	TCCR1B = 0b00010100;
 	TCCR1C = 0x0;
 	TCNT1 = 0x0000;
+	OCR1A = 0x4000;
 	OCR1CH = (pwm & 0xFF00) >> 8;
-	OCR1CL = pwm & 0x0FF;
+	OCR1CL = pwm & 0x0FF;  
+	
 	SREG = 0x80;    
 
 	sprintf(LCD_Line1, "MorseCodeReader ");
