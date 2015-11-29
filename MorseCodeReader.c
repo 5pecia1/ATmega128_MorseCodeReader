@@ -13,7 +13,7 @@
 #define LCD_DELAY2		20   //ms  
 #define PWM                     0x2000
 #define MORSE_LENGTH                36
-#define TEST_COUNT              780
+#define TEST_COUNT              1//780
 #define LINE_LENGTH             17        
 
 void LCD_INIT();       //TEXTLCD 초기화 과정, lcd내의 작은컨트롤러 초기화
@@ -72,7 +72,7 @@ unsigned char LCD_Line2[LINE_LENGTH];
 
 unsigned char led = 0xFE;
 unsigned int cnt = 0, step = 0, click = 0, notend=0, click_cnt = 0;
-unsigned int current_length = 0;  
+unsigned int current_length = 0, out_word=0;  
 
 
 void main(void){
@@ -178,7 +178,7 @@ interrupt [EXT_INT5] void external_int5(void){//del
         step = 2;       
 }    
 interrupt [EXT_INT6] void external_int6(void){//output
-        
+        step = 4;
 }
   
 interrupt  [TIM1_OVF] void timer_int(void){
@@ -194,7 +194,7 @@ interrupt  [TIM1_OVF] void timer_int(void){
 }  
 
 interrupt  [TIM0_COMP] void timer_comp0(void){
-        int i; 
+        int i, check; 
         
         if(current_length == LINE_LENGTH - 1){
                string_output_segment(max);           
@@ -204,7 +204,12 @@ interrupt  [TIM0_COMP] void timer_comp0(void){
         else if(step == 1){
                 string_output_segment(in);
 
-                if(click == 0 && cnt > 3){//word to word
+                if(click == 0 && cnt > 3){//word to word 
+                        if(cnt >=7 && notend == 0 && current_length != 0 && LCD_Line1[current_length-1]!=' '){
+                                LCD_Line1[current_length++] = ' ';
+                                LCD_Line1[current_length] = 0;
+                                LCD_DISP_STRING(LCD_Line1, LCD_Line2);
+                        }
                         if(notend){ 
                                 for(i = 0; i< MORSE_LENGTH; i++){
                                         if(notend == morse[i]){ 
@@ -215,12 +220,12 @@ interrupt  [TIM0_COMP] void timer_comp0(void){
                                         }
                                 }  
                         }                
-                }                                       
+                }                                      
                 else{//spell to spell
                       if(click_cnt >= 3 && click == 2){//long line 
                              notend <<= 4;
                              notend |= 0b111;
-                             cnt = 0;
+                                     cnt = 0;
                              click = 0;
                       }                            
                       else if(click == 2){//short line 
@@ -242,6 +247,7 @@ interrupt  [TIM0_COMP] void timer_comp0(void){
                 }        
                 step =3;
                 cnt =0;
+                click = 0;
         }              
         else if(step == 3){//display del for segment
                 if(cnt > 32+16){
@@ -251,7 +257,45 @@ interrupt  [TIM0_COMP] void timer_comp0(void){
                 string_output_segment(del);           
                 cnt++;
 
-        }  
+        }
+        else if(step == 4){//output line  
+                string_output_segment(out);
+                if(current_length > 0 || out_word != 0){//라인이 비어 있지 않으면 
+                        if(out_word == 0){
+                                out_word = LCD_Line1[--current_length];
+                                if(out_word == ' '){
+                                        out_word = LCD_Line1[--current_length];
+                                }
+                                LCD_DISP_STRING(LCD_Line1, LCD_Line2);
+                                LCD_Line1[current_length] = 0;        
+                                if(out_word >= 'A'){//알파벳이면
+                                        out_word = morse[out_word-'A'];
+                                }
+                                else{                              
+                                        out_word = morse[out_word-'0'+26];
+                                }
+                        }        
+                        else{
+                                check = out_word & 0b10;
+                                if(check == 0b10){//long word
+                                        out_word >>= 3;
+                                        PORTC = 0x00;
+                                }                            
+                                else{//short word
+                                        out_word >>= 1; 
+                                        PORTC = 0xFE;
+                                } 
+                                delay_ms(500);
+                                PORTC = 0xFF;
+                                delay_ms(500);
+                        }                             
+
+                }
+                else{     
+                        PORTC = 0xFF;
+                        step = 1;
+                }
+        }
         
 }   
                 
