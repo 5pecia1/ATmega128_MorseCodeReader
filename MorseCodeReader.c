@@ -16,14 +16,14 @@
 void LCD_INIT();       //TEXTLCD 초기화 과정, lcd내의 작은컨트롤러 초기화
 void LCD_DISP_STRING(unsigned char *char_array, unsigned char *char_array2); //어떤스트링 값을 텍스트 LCD에 찍기* 함
 void test_output();                  
-void input_morse();
+void start_morse();
 void string_output_segment(char *);
 char seg_pat[16] = {
  0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07
  ,0x7f,0x6f,0x77,0x7c,0x39,0x5e,0x79,0x71};
 
 char test[4] = {0x78,0x79,0x6d,0x78};
-char in [4] = {0x00,0x00,0x60,0x54};
+char in [4] = {0x00,0x00,0x30,0x54};
 char out[4] = {0x00,0x5C,0x1C,0x78};
 char del[4] = {0x00,0x5E,0x79,0x38};
 char pulseA = 0b00000011;      
@@ -50,16 +50,17 @@ void main(void){
         LCD_INIT();
 	test_output();          
 	while(step == 0);
-	while(1){
-	        while(step == 1){
-	                input_morse();
-	        }
-	        
-	}
+        start_morse();
+	 
 	
 }
            
-void input_morse(){
+void start_morse(){
+        TIMSK = 0x02;
+        TCCR0 = 0b00001111;
+        OCR0 = 255;
+        TCNT0 = 0x00;
+        SREG = 0x80;
         
 }
 void test_output(){
@@ -100,8 +101,13 @@ void string_output_segment(char *string){
 		PORTB = 0x00;
 	}
 }
-                   
-interrupt [TIM0_OVF] void timer_comp0(void){ 
+interrupt  [TIM0_COMP] void timer_comp0(void){
+        if(step == 1){
+                string_output_segment(in);
+                
+        }
+}                   
+interrupt [TIM0_OVF] void timer_ovf0(void){ 
         cnt++;
         string_output_segment(test);           
         if(cnt > TEST_COUNT){//세 번 움직임.    
