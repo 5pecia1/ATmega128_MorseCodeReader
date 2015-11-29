@@ -12,7 +12,7 @@
 #define LCD_DELAY		1   //ms
 #define LCD_DELAY2		20   //ms  
 #define PWM                     0x2000
-
+#define TEST_COUNT              780
 void LCD_INIT();       //TEXTLCD 초기화 과정, lcd내의 작은컨트롤러 초기화
 void LCD_DISP_STRING(unsigned char *char_array, unsigned char *char_array2); //어떤스트링 값을 텍스트 LCD에 찍기* 함
 void test_output();                  
@@ -104,7 +104,7 @@ void string_output_segment(char *string){
 interrupt [TIM0_OVF] void timer_comp0(void){ 
         cnt++;
         string_output_segment(test);           
-        if(cnt > 780){//세 번 움직임.    
+        if(cnt > TEST_COUNT){//세 번 움직임.    
                  PORTC = 0xFF;
                  TIMSK = 0x00;
                  TCCR1A = 0x00; 
