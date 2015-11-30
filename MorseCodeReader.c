@@ -13,7 +13,7 @@
 #define LCD_DELAY2		20   //ms  
 #define PWM                     0x2000
 #define MORSE_LENGTH                36
-#define TEST_COUNT              1//780
+#define TEST_COUNT              780
 #define LINE_LENGTH             17        
 
 void LCD_INIT();       //TEXTLCD 초기화 과정, lcd내의 작은컨트롤러 초기화
@@ -23,6 +23,12 @@ void start_morse();
 void string_output_segment(char *);
 void display_word(int);
 void change_OC1C(int);
+void input();
+void delete();
+void delete_display();
+void output();
+void output_display();
+
 char seg_pat[16] = {
  0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07
  ,0x7f,0x6f,0x77,0x7c,0x39,0x5e,0x79,0x71
@@ -120,7 +126,7 @@ void start_morse(){
 }
 void test_output(){ 
 	sprintf(LCD_Line1, "MorseCodeReader");
-	sprintf(LCD_Line2, "test");
+	sprintf(LCD_Line2, "MadeBy sol,chul");
 	LCD_DISP_STRING(LCD_Line1, LCD_Line2);
         
 	
@@ -137,6 +143,130 @@ void test_output(){
 	
 	SREG = 0x80;  	       
 }               
+     
+void input(){  
+        int i;
+        string_output_segment(in);
+
+        if(click == 0 && cnt > 3){//word to word 
+                if(cnt >=7 && notend == 0 && current_length != 0 && LCD_Line1[current_length-1]!=' '){
+                        LCD_Line1[current_length++] = ' ';
+                        LCD_Line1[current_length] = 0;
+                        LCD_DISP_STRING(LCD_Line1, LCD_Line2);
+                }
+                if(notend){ 
+                        for(i = 0; i< MORSE_LENGTH; i++){
+                                if(notend == morse[i]){ 
+                                        notend = 0;   
+                                        click =0;
+                                        cnt=0;
+                                        display_word(i);
+                                        break;
+                                }
+                        }  
+                }                
+        }                                      
+        else{//spell to spell
+                if(click_cnt >= 3 && click == 2){//long line 
+                        notend <<= 4;
+                        notend |= 0b111;
+                                     cnt = 0;
+                        click = 0;
+                }                            
+                else if(click == 2){//short line 
+                        notend <<= 2;
+                        notend |= 0b1;
+                        click = 0;
+                }
+         }
+         sprintf(LCD_Line2, "NInCn:%d,InCn:%d",cnt,click_cnt);
+	 LCD_DISP_STRING(LCD_Line1, LCD_Line2);
+}
+void delete(){  
+        if(notend){
+                notend =0;
+        }                 
+        else if(current_length > 0){ 
+                LCD_Line1[--current_length] = 0;        
+                LCD_DISP_STRING(LCD_Line1, LCD_Line2);       
+        }        
+        step =3;
+        cnt =0;
+        click = 0;
+}
+void delete_display(){
+        if(cnt > 32+16){
+                step = 1;
+                cnt = 0;
+        }               
+        string_output_segment(del);           
+        cnt++;
+}
+void output(){
+        string_output_segment(out);   
+                
+        if(current_output < current_length || out_word != 0){//라인이 비어 있지 않으면 
+                if(out_word == 0){
+                        out_word = LCD_Line1[current_output];
+                        if((char)out_word == ' '){//space면 한번 쉼
+                                out_word = 0; 
+                                LCD_Line1[current_output++] = ' ';
+                                LCD_DISP_STRING(LCD_Line1, LCD_Line2); 
+                                delay_ms(500);
+                                return;
+                        }
+                        LCD_Line1[current_output++] = ' '; 
+                        LCD_DISP_STRING(LCD_Line1, LCD_Line2);
+                                       
+                                
+                        if(out_word >= 'A'){//알파벳이면
+                                out_word = morse[out_word-'A'];
+                        }
+                        else{                              
+                                out_word = morse[out_word-'0'+26];
+                        }     
+                                
+                        while((out_word & 0x80000000) != 0x80000000){ 
+                                out_word =out_word << 1;             
+                        }
+                        led = 0xFF;
+                        step=5;  
+                 }        
+                 else{                                            
+                        if((out_word & 0x40000000) == 0x40000000){//long word
+                                out_word = out_word << 4;
+                                led = 0x00;
+                        }                            
+                        else{//short word
+                                out_word = out_word << 2;
+                                led = 0xFE;
+                        } 
+
+                        step = 5;         
+                 }                             
+
+        }
+        else{     
+                 PORTC = 0xFF;
+                 step = 1;
+                 cnt =0;
+                 current_output = 0;
+                 current_length = 0;
+        }
+}
+void output_display(){
+        if(cnt > 32+16){
+                step = 4;
+                cnt = 0;
+        }
+        else if(cnt > 32){
+                led=0xFF;
+        }
+                
+        PORTC = led;               
+        string_output_segment(out);           
+        cnt++;
+}
   
 void display_word(int num){      
         LCD_Line1[current_length++] = morse_change[num];
@@ -170,7 +300,9 @@ void change_OC1C(int val){
         else{                 
                 pulseB = 0b101;
         }
-}
+}   
+
+
 
 interrupt [EXT_INT4] void external_int4(void){//input 
          //make MAX i<LINE_LENGTH && 
@@ -209,7 +341,6 @@ interrupt  [TIM1_OVF] void timer_int(void){
 }  
 
 interrupt  [TIM0_COMP] void timer_comp0(void){
-        int i; 
         
         if(current_length == LINE_LENGTH - 1){
                string_output_segment(max);           
@@ -217,127 +348,19 @@ interrupt  [TIM0_COMP] void timer_comp0(void){
         }
         
         else if(step == 1){
-                string_output_segment(in);
-
-                if(click == 0 && cnt > 3){//word to word 
-                        if(cnt >=7 && notend == 0 && current_length != 0 && LCD_Line1[current_length-1]!=' '){
-                                LCD_Line1[current_length++] = ' ';
-                                LCD_Line1[current_length] = 0;
-                                LCD_DISP_STRING(LCD_Line1, LCD_Line2);
-                        }
-                        if(notend){ 
-                                for(i = 0; i< MORSE_LENGTH; i++){
-                                        if(notend == morse[i]){ 
-                                                 notend = 0;   
-                                                 click =0;
-                                                 cnt=0;
-                                                 display_word(i);
-                                                 break;
-                                        }
-                                }  
-                        }                
-                }                                      
-                else{//spell to spell
-                      if(click_cnt >= 3 && click == 2){//long line 
-                             notend <<= 4;
-                             notend |= 0b111;
-                                     cnt = 0;
-                             click = 0;
-                      }                            
-                      else if(click == 2){//short line 
-                             notend <<= 2;
-                             notend |= 0b1;
-                             click = 0;
-                      }
-                }
-        	 sprintf(LCD_Line2, "c:%d,nt:%x,cc:%d",cnt, notend,click_cnt);
-	         LCD_DISP_STRING(LCD_Line1, LCD_Line2); 
+                input(); 
         }
         else if(step == 2){//del memory | word
-                if(notend){
-                        notend =0;
-                }                 
-                else if(current_length > 0){ 
-                       LCD_Line1[--current_length] = 0;        
-                       LCD_DISP_STRING(LCD_Line1, LCD_Line2);       
-                }        
-                step =3;
-                cnt =0;
-                click = 0;
+                delete();
         }              
         else if(step == 3){//display del for segment
-                if(cnt > 32+16){
-                        step = 1;
-                        cnt = 0;
-                }               
-                string_output_segment(del);           
-                cnt++;
-
+                delete_display();
         }
         else if(step == 4){//output line  
-                string_output_segment(out);   
-                
-                if(current_output < current_length || out_word != 0){//라인이 비어 있지 않으면 
-                        if(out_word == 0){
-                                out_word = LCD_Line1[current_output];
-                                if((char)out_word == ' '){//space면 한번 쉼
-                                        out_word = 0; 
-                                        LCD_Line1[current_output++] = ' ';
-                                        LCD_DISP_STRING(LCD_Line1, LCD_Line2); 
-                                        delay_ms(500);
-                                        return;
-                                }
-                                LCD_Line1[current_output++] = ' '; 
-                                LCD_DISP_STRING(LCD_Line1, LCD_Line2);
-                                       
-                                
-                                if(out_word >= 'A'){//알파벳이면
-                                        out_word = morse[out_word-'A'];
-                                }
-                                else{                              
-                                        out_word = morse[out_word-'0'+26];
-                                }     
-                                
-                                while((out_word & 0x80000000) != 0x80000000){ 
-                                        out_word =out_word << 1;             
-                                }
-                                led = 0xFF;
-                                step=5;  
-                        }        
-                        else{                                            
-                                if((out_word & 0x40000000) == 0x40000000){//long word
-                                        out_word = out_word << 4;
-                                        led = 0x00;
-                                }                            
-                                else{//short word
-                                        out_word = out_word << 2;
-                                        led = 0xFE;
-                                } 
-
-                                step = 5;         
-                        }                             
-
-                }
-                else{     
-                        PORTC = 0xFF;
-                        step = 1;
-                        cnt =0;
-                        current_output = 0;
-                        current_length = 0;
-                }
+                output();
         }
         else if(step == 5){
-                if(cnt > 32+16){
-                        step = 4;
-                        cnt = 0;
-                }
-                else if(cnt > 32){
-                        led=0xFF;
-                }
-                
-                PORTC = led;               
-                string_output_segment(out);           
-                cnt++;
+                output_display();
         }
         change_OC1C((int)ADCL+((int)ADCH << 8));
 }   
