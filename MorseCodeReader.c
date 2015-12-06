@@ -203,9 +203,7 @@ void delete_display(){
         cnt++;
 }
 void output(){
-        string_output_segment(out);   
-    
-        EIMSK = 0x0; //sw 작동 중지   
+        string_output_segment(out);    
              
         if(current_output < current_length || out_word != 0){//라인이 비어 있지 않으면 
                 if(out_word == 0){
@@ -250,7 +248,7 @@ void output(){
         }
         else{     
                  PORTC = 0xFF;
-                 EIMSK = 0b00101001;// sw 작동 
+                 
                  step = 1;
                  cnt =0;
                  current_output = 0;
@@ -328,8 +326,10 @@ interrupt [EXT_INT5] void external_int5(void){//del
                 step = 2;       
 }    
 interrupt [EXT_INT6] void external_int6(void){//output
-        step = 4; 
-        cnt = 0;
+        if(step != 4 && step != 5){
+                step = 4; 
+                cnt = 0;                   
+        }
 }
   
 interrupt  [TIM1_OVF] void timer_int(void){
