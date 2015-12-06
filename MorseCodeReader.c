@@ -69,9 +69,8 @@ char test[4] = {0x78,0x79,0x6d,0x78};
 char in [4] = {0x00,0x00,0x30,0x54};
 char out[4] = {0x00,0x5C,0x1C,0x78};
 char del[4] = {0x00,0x5E,0x79,0x38};
-char max[4] = {0x00, 0b00010101,0b01110111,0b01110110};
-char pulseA = 0b00000011;      
-char pulseB = 0x0;
+char max[4] = {0x00, 0b00010101,0b01110111,0b01110110}; 
+char pulseB = 0x0;//clk선택 변수
 
 unsigned char LCD_Line1[LINE_LENGTH];
 unsigned char LCD_Line2[LINE_LENGTH];
@@ -91,15 +90,15 @@ void main(void){
 	DDRF = 0xF0; //4~1 segment
          
 	ADMUX = 0x0;
-	ADCSRA = 0b11100111;
+	ADCSRA = 0b11100111;//free running, 128분주비
 	
         delay_ms(5);                    
         LCD_INIT();
-	test_output();          
-	while(step == 0);
+	test_output();//육안으로 출력에 이상이 없나 테스트 한다.          
+	while(step == 0);//test하는 동안단계가 넘어가지 않게 함.
         start_morse();
         
-	 while(1);
+	while(1);
        
 	
 }
@@ -108,13 +107,13 @@ void start_morse(){
         //imter0 7segment, timer1 cnt++
         TIMSK = 0b00000110; //timer0 cmp on, timer1 ovf on
         TCCR0 = 0b00001111;//timer 0
-        OCR0 = 255;
-        TCNT0 = 0x00;
+        OCR0 = 255; //출력비교 레지스터 값
+        TCNT0 = 0x00; //타이머/카운터0 레지스터 초기값
         
-        TCCR1A = 0b00001000 | pulseA; //timer1, set oc1c
-	TCCR1B = 0b00010100 | pulseB;
+        TCCR1A = 0b00001011; //timer1, set oc1c
+	TCCR1B = 0b00010100 | pulseB;// clk/256
 	TCCR1C = 0x0;
-	OCR1A = 0x4000;
+	OCR1A = 0x4000;      //TOP VALUE
 	OCR1CH = (PWM & 0xFF00) >> 8;
   	OCR1CL = PWM & 0x0FF;
   	
@@ -130,18 +129,19 @@ void test_output(){
 	LCD_DISP_STRING(LCD_Line1, LCD_Line2);
         
 	
-	TCCR1A = 0b00001000 | pulseA; //set oc1c
-	TCCR1B = 0b00010100 | pulseB;
+	TCCR1A = 0b00001011; //set oc1c
+	TCCR1B = 0b00010100 | pulseB;// clk/256
 	TCCR1C = 0x0;
-	OCR1A = 0x4000;
+	OCR1A = 0x4000;    //TOP VALUE
 	OCR1CH = (PWM & 0xFF00) >> 8;
 	OCR1CL = PWM & 0x0FF;  
 	                   
-	TIMSK = 0x01;
-	TCCR0 = 0x07;
-	TCNT0 = 0x00;    
+	TIMSK = 0x01;//timer0 OVF INT enable
+	TCCR0 = 0x07;//CK/1024
+	TCNT0 = 0x00;//Timer/Count register 초기값
 	
-	SREG = 0x80;  	       
+	SREG = 0x80; //interrupt enable 
+	PORTC = led;	       
 }               
      
 void input(){  
@@ -367,29 +367,23 @@ interrupt  [TIM0_COMP] void timer_comp0(void){
                 
 interrupt [TIM0_OVF] void timer_ovf0(void){//first test code 
         cnt++;
-        string_output_segment(test);           
-        if(cnt > TEST_COUNT){//세 번 움직임.    
+        string_output_segment(test);//7-segment에  test 출력           
+        if(cnt > TEST_COUNT){//TEST_COUNT 만큼 움직였으면 초기화한다.
                  PORTC = 0xFF;
                  TIMSK = 0x00;
                  TCCR1A = 0x00; 
                  TCCR1B = 0x00;
                  sprintf(LCD_Line1, "%s", "");
         	 sprintf(LCD_Line2, "%s", "");
-                LCD_Line1[0] = LCD_Line2[0] = 0;
+                 LCD_Line1[0] = LCD_Line2[0] = 0;
 	         LCD_DISP_STRING(LCD_Line1, LCD_Line2);  
-	         step++;
+	         step++; //다음 step으로 넘어간다.
         }
-        else if((cnt %32)== 31){
-                 if(led == 0x7F){ 
-                         PORTC = led;
-                         led = 0xFE;
-                 }    
-                 else{
-                         PORTC = led;  
-                         led <<= 1;
-                         led |= 0x01;                  
-                 }
-                 
+        else if((cnt %32)== 31){//왼쪽으로 쉬프트
+                  led <<= 1;
+                  led |= 0x01;
+                  if(led == 0xFF) led = 0xFE; 
+                  PORTC = led;
         }        
 }
          
