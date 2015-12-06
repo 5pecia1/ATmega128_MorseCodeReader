@@ -204,7 +204,9 @@ void delete_display(){
 }
 void output(){
         string_output_segment(out);   
-                
+    
+        EIMSK = 0x0; //sw 작동 중지   
+             
         if(current_output < current_length || out_word != 0){//라인이 비어 있지 않으면 
                 if(out_word == 0){
                         out_word = LCD_Line1[current_output];
@@ -248,6 +250,7 @@ void output(){
         }
         else{     
                  PORTC = 0xFF;
+                 EIMSK = 0b00101001;// sw 작동 
                  step = 1;
                  cnt =0;
                  current_output = 0;
@@ -300,6 +303,7 @@ void change_OC1C(int val){
         else{                 
                 pulseB = 0b101;
         }
+        TCCR1B = 0b00010100 | pulseB;
 }   
 
 
@@ -340,7 +344,7 @@ interrupt  [TIM1_OVF] void timer_int(void){
         
 }  
 
-interrupt  [TIM0_COMP] void timer_comp0(void){
+interrupt  [TIM0_COMP] void timer_comp0(void){//run interrupt
         
         if(current_length == LINE_LENGTH - 1){
                string_output_segment(max);           
